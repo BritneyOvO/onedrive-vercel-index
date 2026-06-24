@@ -56,19 +56,33 @@ export async function getAccessToken(): Promise<string> {
   body.append('refresh_token', refreshToken)
   body.append('grant_type', 'refresh_token')
 
-  const resp = await axios.post(apiConfig.authApi, body, {
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-  })
+  const resp = await axios
+    .post(apiConfig.authApi, body, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    })
+    .catch(error => {
+      console.error('Failed to refresh Microsoft Graph access token.', error?.response?.data ?? error?.message ?? error)
+      return null
+    })
+
+  if (!resp) {
+    return ''
+  }
 
   if ('access_token' in resp.data && 'refresh_token' in resp.data) {
     const { expires_in, access_token, refresh_token } = resp.data
-    await storeOdAuthTokens({
-      accessToken: access_token,
-      accessTokenExpiry: parseInt(expires_in),
-      refreshToken: refresh_token,
-    })
+    try {
+      await storeOdAuthTokens({
+        accessToken: access_token,
+        accessTokenExpiry: parseInt(expires_in),
+        refreshToken: refresh_token,
+      })
+    } catch (error) {
+      console.error('Failed to store refreshed Microsoft Graph tokens.', error)
+      return ''
+    }
     console.log('Fetch new access token with stored refresh token.')
     return access_token
   }
@@ -168,7 +182,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return
     }
 
-    await storeOdAuthTokens({ accessToken, accessTokenExpiry, refreshToken })
+    try {
+      await storeOdAuthTokens({ accessToken, accessTokenExpiry, refreshToken })
+    } catch (error: any) {
+      console.error('Failed to store OAuth tokens.', error)
+      res.status(500).json({ error: error?.message ?? 'Failed to store OAuth tokens.' })
+      return
+    }
     res.status(200).send('OK')
     return
   }
@@ -286,7 +306,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(200).json({ file: identityData })
     return
   } catch (error: any) {
-    res.status(error?.response?.code ?? 500).json({ error: error?.response?.data ?? 'Internal server error.' })
+    const status = error?.response?.status ?? 500
+    const message =
+      error?.response?.data?.error?.message ??
+      error?.response?.data ??
+      error?.message ??
+      'Internal server error.'
+    console.error('Failed to fetch OneDrive item.', {
+      status,
+      path: cleanPath,
+      message,
+    })
+    res.status(status).json({ error: message })
     return
   }
 }

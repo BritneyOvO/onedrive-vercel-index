@@ -16,7 +16,10 @@ export async function fetcher([url, token]: [url: string, token?: string]): Prom
         : axios.get(url))
     ).data
   } catch (err: any) {
-    throw { status: err.response.status, message: err.response.data }
+    throw {
+      status: err.response?.status ?? 500,
+      message: err.response?.data ?? err.message ?? 'Internal server error.',
+    }
   }
 }
 
