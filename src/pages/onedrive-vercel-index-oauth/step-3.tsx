@@ -35,9 +35,11 @@ export default function OAuthStep3({ accessToken, expiryTime, refreshToken, erro
     </div>
   )
   const [buttonError, setButtonError] = useState(false)
+  const [buttonErrorDetail, setButtonErrorDetail] = useState('')
 
   const sendAuthTokensToServer = async () => {
     setButtonError(false)
+    setButtonErrorDetail('')
     setButtonContent(
       <div>
         <span>{t('Storing tokens')}</span> <LoadingIcon className="ml-1 inline h-4 w-4 animate-spin" />
@@ -77,8 +79,14 @@ export default function OAuthStep3({ accessToken, expiryTime, refreshToken, erro
           router.push('/')
         }, 2000)
       })
-      .catch(_ => {
+      .catch(err => {
+        const message =
+          err?.response?.data?.error ??
+          err?.response?.data ??
+          err?.message ??
+          'Unknown error while storing tokens.'
         setButtonError(true)
+        setButtonErrorDetail(typeof message === 'string' ? message : JSON.stringify(message))
         setButtonContent(
           <div>
             <span>{t('Error storing the token')}</span> <FontAwesomeIcon icon="exclamation-circle" />
@@ -211,6 +219,11 @@ export default function OAuthStep3({ accessToken, expiryTime, refreshToken, erro
                   >
                     {buttonContent}
                   </button>
+                  {buttonErrorDetail && (
+                    <pre className="mt-3 whitespace-pre-wrap rounded border border-red-400/30 bg-red-50 p-2 text-left font-mono text-xs text-red-700 dark:bg-red-900/30 dark:text-red-200">
+                      {buttonErrorDetail}
+                    </pre>
+                  )}
                 </div>
               </div>
             )}
